@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Médias (lourds / perso)
+input/
+output/
+videopourblobart/
+*.mp4
+*.mov
+*.webm
+
+# Modèles (hand_landmarker téléchargé auto ; KNN regénéré par train.py)
+models/
+
+# Dataset cloné (repo git séparé)
+narutohandsigns/

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Blob Art</title>
+  <style>
+    :root {
+      --bg: #000;
+      --fg: #e6e6e6;
+      --muted: #8a8a8a;
+      --accent: #50dc78;
+      --panel: rgba(12, 12, 12, 0.72);
+      --border: rgba(255, 255, 255, 0.14);
+      --rec: #ff4d4d;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--fg);
+      font: 14px/1.4 ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+      overflow: hidden;
+      -webkit-user-select: none; user-select: none;
+    }
+    #stage {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #out { max-width: 100%; max-height: 100%; display: block; }
+    video { display: none; }
+
+    #bar {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+      max-width: calc(100vw - 32px);
+      padding: 6px; border-radius: 14px;
+      background: var(--panel); border: 1px solid var(--border);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: opacity .3s;
+    }
+    #bar.hidden { opacity: 0; pointer-events: none; }
+    button {
+      font: inherit; color: var(--fg); background: transparent;
+      border: 1px solid transparent; border-radius: 9px;
+      padding: 8px 12px; min-height: 40px; cursor: pointer;
+    }
+    button:hover { border-color: var(--border); }
+    button.active { border-color: var(--accent); color: var(--accent); }
+    button.rec { color: var(--rec); border-color: var(--rec); }
+    .sep { width: 1px; background: var(--border); margin: 4px 2px; }
+
+    #start {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; padding: 16px; text-align: center; background: var(--bg);
+    }
+    #start h1 { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: .04em; }
+    #start p { margin: 0; color: var(--muted); max-width: 420px; }
+    #start button {
+      border-color: var(--accent); color: var(--accent);
+      padding: 12px 22px; font-size: 16px;
+    }
+    #status {
+      position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%;
+      transform: translateX(-50%); color: var(--muted); font-size: 12px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"><canvas id="out"></canvas></div>
+  <video id="video" playsinline muted></video>
+
+  <div id="bar" class="hidden">
+    <button data-mode="0">1 Default</button>
+    <button data-mode="1">2 Loupe</button>
+    <button data-mode="2">3 Vitrail</button>
+    <button data-mode="3">4 Voronoï</button>
+    <span class="sep"></span>
+    <button id="btn-gesture" class="active" title="Changer de mode avec les doigts">✋</button>
+    <button id="btn-flip" title="Caméra avant / arrière">⟲</button>
+    <button id="btn-rec" title="Enregistrer">●</button>
+  </div>
+
+  <div id="start">
+    <h1>Blob Art</h1>
+    <p>Détection de mouvement, couleurs hex en direct, triangulation.
+       Lève 1 à 4 doigts et tiens 1,5 s pour changer de mode.</p>
+    <button id="btn-start">Démarrer la caméra</button>
+  </div>
+  <div id="status"></div>
+
+  <script type="module" src="blob_art.js"></script>
+</body>
+</html>
