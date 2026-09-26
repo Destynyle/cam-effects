@@ -71,17 +71,20 @@ En mode fichier vidéo, la détection main est désactivée (mode fixe, plus rap
 | Invocation | Boar → Dog → Bird → Monkey → Ram |
 | Doton Mur | Dog → Boar → Ram |
 
-## Version web (`web/`)
-- `index.html` + `blob_art.js`, statique, aucun build. Libs CDN : `d3-delaunay`, `@mediapipe/tasks-vision` 0.10.14
-- Détection mouvement faite main (fond moyen glissant + seuil + morpho 3×3 + composantes connexes) sur image réduite à 192px — pas d'OpenCV.js
-- Modes : gestes 1-4 doigts, boutons, touches 1-4, `?mode=vitrail` dans l'URL
-- Extras : caméra avant/arrière, enregistrement (MediaRecorder → mp4/webm), tap/H = masquer la barre
-- Local : `python -m http.server -d web 8000` → http://localhost:8000
-- Smartphone : caméra exige HTTPS → passer par le déploiement
+## Version web (`web/`) — https://destynyle.github.io/cam-effects/
+- Repo : github.com/Destynyle/cam-effects (public, Pages sur `main` /), email commits : destysom01@gmail.com
+- Statique, aucun build. `app.js` = noyau, `effects/*.js` = 1 module par effet (interface décrite en tête de app.js)
+- Libs CDN : `@mediapipe/tasks-vision` 0.10.14 (HandLandmarker 2 mains + ImageSegmenter selfie), `d3-delaunay`
+- blob_art : détection mouvement faite main (pas d'OpenCV.js)
+- multi_clone : segmentation MediaPipe (plus de calibration fond)
+- ninjutsu : `export_knn.py` → 600 ex/signe, int8 → web/models/signs_knn.bin (1 Mo, 99,6 %)
+- shape_control : formes 3D ×size (la version Python les dessinait quasi ponctuelles : verts × size/80)
+- Test headless : chromium --use-fake-device-for-media-stream --use-file-for-fake-video-capture=x.y4m + CDP
+- Caméra exige HTTPS (ou localhost)
 
 ## Prochaines étapes
-1. ~~Version web blob_art~~ → fait, dans `web/` (voir ci-dessus)
-2. **Déploiement** — GitHub Pages ou Vercel (gratuit, sans serveur)
+1. ~~Version web~~ → fait, les 5 effets (voir ci-dessus)
+2. ~~Déploiement~~ → GitHub Pages
 3. **TouchDesigner** — intégration OSC depuis Python vers le fixe Windows
 4. **domain_expansion.py** — effet JJK pas encore codé
 5. **Collecte de données perso** — améliorer le KNN ninjutsu avec ses propres mains

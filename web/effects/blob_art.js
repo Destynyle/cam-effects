@@ -1,23 +1,17 @@
 /*
- * Blob Art — version web
- * ──────────────────────
- * Portage de effects/blob_art.py : détection de mouvement → blobs,
- * couleur dominante + code hex, triangulation entre blobs.
+ * Blob Art — portage de effects/blob_art.py
+ * ─────────────────────────────────────────
+ * Détection de mouvement → blobs, couleur dominante + code hex,
+ * triangulation entre blobs.
  *
  * Modes (1-4 doigts maintenus 1.5s, boutons, ou touches 1-4) :
  *   Default · Loupe · Vitrail · Voronoï
  */
 
 import { Delaunay } from "https://cdn.jsdelivr.net/npm/d3-delaunay@6/+esm";
-
-const MP_VERSION = "0.10.14";
-const MP_URL     = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
-const MODEL_URL  =
-  "https://storage.googleapis.com/mediapipe-models/" +
-  "hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+import { rgb, mono, circle } from "./common.js";
 
 // ── Paramètres blobs (référence 640px de large, comme la version Python) ─────
-const REF_W          = 640;
 const MIN_BLOB_FRAC  = 400 / (640 * 480);   // MIN_BLOB_AREA relatif à l'image
 const MAX_BLOBS      = 12;
 const TRAIL_LEN      = 18;
@@ -44,7 +38,6 @@ const GESTURE_HOLD_MS  = 1500;
 
 const hex2 = (v) => v.toString(16).padStart(2, "0").toUpperCase();
 const toHex = ([r, g, b]) => `#${hex2(r)}${hex2(g)}${hex2(b)}`;
-const rgb = ([r, g, b]) => `rgb(${r},${g},${b})`;
 const luminance = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
 const textColor = (c) => (luminance(c) > 140 ? "#141414" : "#e6e6e6");
 const mix = (...cs) => [0, 1, 2].map((k) => Math.round(cs.reduce((s, c) => s + c[k], 0) / cs.length));
@@ -68,7 +61,7 @@ class MotionDetector {
     this.frames = 0;
   }
 
-  // morphologie 3×3 séparable : op = max (dilatation) ou min (érosion)
+  // morphologie 3×3 séparable : dilatation (OR) ou érosion (AND)
   _morph(src, dst, dilate) {
     const { w, h, tmp2: t } = this;
     const pick = dilate ? (a, b, c) => a | b | c : (a, b, c) => a & b & c;
@@ -125,11 +118,11 @@ class MotionDetector {
     this._morph(a, b, false); this._morph(b, a, false);
     this._morph(a, b, false); this._morph(b, a, true);
 
-    return this._components(data);
+    return this._components();
   }
 
   // composantes connexes (4-voisinage) par remplissage
-  _components(data) {
+  _components() {
     const { w, h, mask, labels, stack } = this;
     labels.fill(0);
     const minArea = MIN_BLOB_FRAC * w * h;
@@ -235,7 +228,7 @@ function renderDefault(ctx, blobs, u) {
   ctx.globalAlpha = 1;
 
   const font = Math.max(10, 10 * u);
-  ctx.font = `${font}px ui-monospace, Menlo, Consolas, monospace`;
+  ctx.font = mono(font);
   ctx.textBaseline = "alphabetic";
 
   for (const b of blobs) {
@@ -255,13 +248,13 @@ function renderDefault(ctx, blobs, u) {
     ctx.globalAlpha = 0.3;
     ctx.strokeStyle = rgb(color);
     ctx.lineWidth = u;
-    ctx.beginPath(); ctx.arc(x, y, r + 10 * u, 0, Math.PI * 2); ctx.stroke();
+    circle(ctx, x, y, r + 10 * u); ctx.stroke();
     ctx.globalAlpha = 1;
 
     ctx.lineWidth = 2 * u;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    circle(ctx, x, y, r); ctx.stroke();
     ctx.fillStyle = rgb(color);
-    ctx.beginPath(); ctx.arc(x, y, 4 * u, 0, Math.PI * 2); ctx.fill();
+    circle(ctx, x, y, 4 * u); ctx.fill();
 
     // label hex
     const label = toHex(color);
@@ -271,9 +264,9 @@ function renderDefault(ctx, blobs, u) {
     ctx.fillStyle = textColor(color);
     ctx.fillText(label, lx, ly);
     ctx.fillStyle = "#b4b4b4";
-    ctx.font = `${font * 0.85}px ui-monospace, Menlo, Consolas, monospace`;
+    ctx.font = mono(font * 0.85);
     ctx.fillText(`${Math.round(x)},${Math.round(y)}`, lx, ly + font + 4 * u);
-    ctx.font = `${font}px ui-monospace, Menlo, Consolas, monospace`;
+    ctx.font = mono(font);
   }
 }
 
@@ -285,17 +278,17 @@ function renderLoupe(ctx, source, blobs, u, zoom = 2.5) {
     const srcR = Math.max(r / zoom, 8 * u);
 
     ctx.save();
-    ctx.beginPath(); ctx.arc(x, y, r - 1, 0, Math.PI * 2); ctx.clip();
+    circle(ctx, x, y, r - 1); ctx.clip();
     ctx.drawImage(source, x - srcR, y - srcR, srcR * 2, srcR * 2, x - r, y - r, r * 2, r * 2);
     ctx.restore();
 
     // bague
     ctx.strokeStyle = rgb(color);
     ctx.lineWidth = 2 * u;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    circle(ctx, x, y, r); ctx.stroke();
     ctx.strokeStyle = "#dcdcdc";
     ctx.lineWidth = u;
-    ctx.beginPath(); ctx.arc(x, y, r + 3 * u, 0, Math.PI * 2); ctx.stroke();
+    circle(ctx, x, y, r + 3 * u); ctx.stroke();
 
     // reflet
     ctx.strokeStyle = "#fff";
@@ -324,7 +317,7 @@ function renderVitrail(ctx, blobs, u, alpha = 0.55) {
   ctx.globalAlpha = 1;
 
   ctx.fillStyle = "#fff";
-  for (const b of blobs) { ctx.beginPath(); ctx.arc(b.x, b.y, 4 * u, 0, Math.PI * 2); ctx.fill(); }
+  for (const b of blobs) { circle(ctx, b.x, b.y, 4 * u); ctx.fill(); }
 }
 
 // ── Mode 4 : Voronoï ─────────────────────────────────────────────────────────
@@ -348,31 +341,14 @@ function renderVoronoi(ctx, blobs, u, w, h, alpha = 0.45) {
     ctx.fillStyle = "#fff";
     ctx.strokeStyle = rgb(b.color);
     ctx.lineWidth = 2 * u;
-    ctx.beginPath(); ctx.arc(b.x, b.y, 5 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    circle(ctx, b.x, b.y, 5 * u); ctx.fill(); ctx.stroke();
   }
 }
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Gestes — MediaPipe Hand Landmarker
+// Gestes — changement de mode
 // ══════════════════════════════════════════════════════════════════════════════
-
-async function makeDetector() {
-  const { FilesetResolver, HandLandmarker } = await import(`${MP_URL}/vision_bundle.mjs`);
-  const fileset = await FilesetResolver.forVisionTasks(`${MP_URL}/wasm`);
-  const opts = (delegate) => ({
-    baseOptions: { modelAssetPath: MODEL_URL, delegate },
-    runningMode: "VIDEO",
-    numHands: 1,
-    minHandDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5,
-  });
-  try {
-    return await HandLandmarker.createFromOptions(fileset, opts("GPU"));
-  } catch {
-    return await HandLandmarker.createFromOptions(fileset, opts("CPU"));
-  }
-}
 
 // doigts levés (index → auriculaire), 0-4
 function countFingers(lm) {
@@ -406,14 +382,9 @@ class GestureModeSwitcher {
   }
 }
 
-
-// ══════════════════════════════════════════════════════════════════════════════
-// HUD
-// ══════════════════════════════════════════════════════════════════════════════
-
 function drawHud(ctx, w, h, u, modeIdx, nBlobs, gesture, hand) {
   const font = Math.max(12, 13 * u);
-  ctx.font = `${font}px ui-monospace, Menlo, Consolas, monospace`;
+  ctx.font = mono(font);
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#b4b4b4";
   ctx.textAlign = "left";
@@ -435,193 +406,85 @@ function drawHud(ctx, w, h, u, modeIdx, nBlobs, gesture, hand) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Application
+// Effet
 // ══════════════════════════════════════════════════════════════════════════════
 
-const $ = (s) => document.querySelector(s);
-const video  = $("#video");
-const out    = $("#out");
-const ctx    = out.getContext("2d");
-const status = $("#status");
+export default {
+  id: "blob_art",
+  label: "Blob Art",
+  help: "Bouge devant la caméra : les zones en mouvement deviennent des blobs colorés.<br>" +
+        "Lève 1 à 4 doigts et tiens 1,5 s pour changer de mode (ou touches 1-4).",
+  needs: { hands: true },
 
-const frameCanvas = document.createElement("canvas");   // image propre (miroir), source de la loupe
-const frameCtx    = frameCanvas.getContext("2d");
-const procCanvas  = document.createElement("canvas");   // image réduite pour la détection
-const procCtx     = procCanvas.getContext("2d", { willReadFrequently: true });
+  create({ W, H, params, refreshControls }) {
+    const s = PROC_SIZE / Math.max(W, H);
+    const proc = document.createElement("canvas");
+    proc.width = Math.round(W * s);
+    proc.height = Math.round(H * s);
+    const procCtx = proc.getContext("2d", { willReadFrequently: true });
 
-const state = {
-  facing: "user",
-  stream: null,
-  motion: null,
-  tracker: new Tracker(),
-  switcher: new GestureModeSwitcher(),
-  detector: null,
-  gestures: true,
-  lastTime: -1,
-  recorder: null,
+    const motion = new MotionDetector(proc.width, proc.height);
+    const tracker = new Tracker();
+    const switcher = new GestureModeSwitcher();
+    const initial = MODES.indexOf(params.get("mode"));
+    if (initial >= 0) switcher.modeIdx = initial;
+
+    const fx = {
+      useHands: true,
+
+      controls: [
+        ...MODE_LABELS.map((l, i) => ({ id: `mode${i}`, label: `${i + 1} ${l}` })),
+        { id: "gestures", label: "✋", title: "Changer de mode avec les doigts" },
+      ],
+      isActive: (id) => (id === "gestures" ? fx.useHands : id === `mode${switcher.modeIdx}`),
+      onControl(id) {
+        if (id === "gestures") fx.useHands = !fx.useHands;
+        else switcher.modeIdx = +id.slice(4);
+      },
+      onKey(key) {
+        const n = +key;
+        if (n >= 1 && n <= MODES.length) switcher.modeIdx = n - 1;
+      },
+
+      frame({ ctx, source, W, H, u, now, hands }) {
+        // détection de mouvement sur l'image réduite
+        const pw = proc.width, ph = proc.height;
+        procCtx.drawImage(source, 0, 0, pw, ph);
+        const data = procCtx.getImageData(0, 0, pw, ph).data;
+        const scale = W / pw;
+        const blobs = motion.detect(data).map((b) => ({
+          x: (b.x + 0.5) * scale,
+          y: (b.y + 0.5) * scale,
+          r: Math.sqrt((b.area * scale * scale) / Math.PI),
+          color: sampleColor(data, pw, ph, b.x, b.y, (SAMPLE_RADIUS * u) / scale),
+        }));
+        tracker.update(blobs, 80 * u);
+
+        // geste
+        let hand = null, fingers = -1;
+        const h0 = hands?.[0];
+        if (fx.useHands && h0) {
+          fingers = countFingers(h0.lm);
+          hand = h0.px[9];
+        }
+        const before = switcher.modeIdx;
+        const gesture = switcher.update(fingers, now);
+        if (switcher.modeIdx !== before) refreshControls();
+
+        // rendu
+        ctx.drawImage(source, 0, 0);
+        ctx.fillStyle = `rgba(0,0,0,${DARKEN})`;
+        ctx.fillRect(0, 0, W, H);
+
+        switch (MODES[switcher.modeIdx]) {
+          case "default": renderDefault(ctx, blobs, u); break;
+          case "loupe":   renderLoupe(ctx, source, blobs, u); break;
+          case "vitrail": renderVitrail(ctx, blobs, u); break;
+          case "voronoi": renderVoronoi(ctx, blobs, u, W, H); break;
+        }
+        drawHud(ctx, W, H, u, switcher.modeIdx, blobs.length, gesture, hand);
+      },
+    };
+    return fx;
+  },
 };
-
-const initialMode = MODES.indexOf(new URLSearchParams(location.search).get("mode"));
-if (initialMode >= 0) state.switcher.modeIdx = initialMode;
-
-function setStatus(msg) { status.textContent = msg || ""; }
-
-function syncButtons() {
-  document.querySelectorAll("[data-mode]").forEach((b) =>
-    b.classList.toggle("active", +b.dataset.mode === state.switcher.modeIdx));
-  $("#btn-gesture").classList.toggle("active", state.gestures);
-}
-
-async function startCamera() {
-  state.stream?.getTracks().forEach((t) => t.stop());
-  state.stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: state.facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-    audio: false,
-  });
-  video.srcObject = state.stream;
-  await video.play();
-
-  const W = video.videoWidth, H = video.videoHeight;
-  out.width = frameCanvas.width = W;
-  out.height = frameCanvas.height = H;
-  const s = PROC_SIZE / Math.max(W, H);
-  procCanvas.width = Math.round(W * s);
-  procCanvas.height = Math.round(H * s);
-  state.motion = new MotionDetector(procCanvas.width, procCanvas.height);
-  state.tracker = new Tracker();
-  state.lastTime = -1;
-}
-
-function tick() {
-  requestAnimationFrame(tick);
-  if (!state.motion || video.readyState < 2 || video.currentTime === state.lastTime) return;
-  state.lastTime = video.currentTime;
-
-  const W = out.width, H = out.height;
-  const u = Math.max(W, H) / REF_W;   // unité de dessin (1 = pixel en 640px)
-  const mirror = state.facing === "user";
-
-  // 1. image propre (miroir si caméra frontale)
-  frameCtx.save();
-  if (mirror) { frameCtx.translate(W, 0); frameCtx.scale(-1, 1); }
-  frameCtx.drawImage(video, 0, 0, W, H);
-  frameCtx.restore();
-
-  // 2. détection de mouvement sur l'image réduite
-  const pw = procCanvas.width, ph = procCanvas.height;
-  procCtx.drawImage(frameCanvas, 0, 0, pw, ph);
-  const data = procCtx.getImageData(0, 0, pw, ph).data;
-  const scale = W / pw;
-  const blobs = state.motion.detect(data).map((b) => ({
-    x: (b.x + 0.5) * scale,
-    y: (b.y + 0.5) * scale,
-    r: Math.sqrt((b.area * scale * scale) / Math.PI),
-    color: sampleColor(data, pw, ph, b.x, b.y, (SAMPLE_RADIUS * u) / scale),
-  }));
-  state.tracker.update(blobs, 80 * u);
-
-  // 3. geste
-  let hand = null, fingers = -1;
-  if (state.gestures && state.detector) {
-    const res = state.detector.detectForVideo(video, performance.now());
-    const lm = res.landmarks?.[0];
-    if (lm) {
-      fingers = countFingers(lm);
-      hand = { x: (mirror ? 1 - lm[9].x : lm[9].x) * W, y: lm[9].y * H };
-    }
-  }
-  const before = state.switcher.modeIdx;
-  const gesture = state.switcher.update(fingers, performance.now());
-  if (state.switcher.modeIdx !== before) syncButtons();
-
-  // 4. rendu
-  ctx.drawImage(frameCanvas, 0, 0);
-  ctx.fillStyle = `rgba(0,0,0,${DARKEN})`;
-  ctx.fillRect(0, 0, W, H);
-
-  switch (MODES[state.switcher.modeIdx]) {
-    case "default": renderDefault(ctx, blobs, u); break;
-    case "loupe":   renderLoupe(ctx, frameCanvas, blobs, u); break;
-    case "vitrail": renderVitrail(ctx, blobs, u); break;
-    case "voronoi": renderVoronoi(ctx, blobs, u, W, H); break;
-  }
-  drawHud(ctx, W, H, u, state.switcher.modeIdx, blobs.length, gesture, hand);
-}
-
-
-// ── Enregistrement ───────────────────────────────────────────────────────────
-
-function toggleRecording() {
-  const btn = $("#btn-rec");
-  if (state.recorder) {
-    state.recorder.stop();
-    return;
-  }
-  const type = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t));
-  const rec = new MediaRecorder(out.captureStream(30), type ? { mimeType: type } : undefined);
-  const chunks = [];
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  rec.onstop = () => {
-    const blob = new Blob(chunks, { type: rec.mimeType });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `blob_art_${MODES[state.switcher.modeIdx]}_${Date.now()}.${rec.mimeType.includes("mp4") ? "mp4" : "webm"}`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    state.recorder = null;
-    btn.classList.remove("rec");
-    btn.textContent = "●";
-  };
-  rec.start(1000);
-  state.recorder = rec;
-  btn.classList.add("rec");
-  btn.textContent = "■";
-}
-
-
-// ── UI ───────────────────────────────────────────────────────────────────────
-
-$("#btn-start").addEventListener("click", async () => {
-  $("#btn-start").disabled = true;
-  try {
-    await startCamera();
-  } catch (e) {
-    $("#btn-start").disabled = false;
-    $("#start p").textContent = `Caméra inaccessible : ${e.message}. La page doit être servie en HTTPS (ou localhost).`;
-    return;
-  }
-  $("#start").remove();
-  $("#bar").classList.remove("hidden");
-  syncButtons();
-  requestAnimationFrame(tick);
-
-  setStatus("chargement du modèle main…");
-  makeDetector()
-    .then((d) => { state.detector = d; setStatus(""); })
-    .catch((e) => { console.warn(e); state.gestures = false; syncButtons(); setStatus("gestes indisponibles — utilise les boutons"); });
-});
-
-document.querySelectorAll("[data-mode]").forEach((b) =>
-  b.addEventListener("click", () => { state.switcher.modeIdx = +b.dataset.mode; syncButtons(); }));
-
-$("#btn-gesture").addEventListener("click", () => {
-  if (!state.detector) return;
-  state.gestures = !state.gestures;
-  syncButtons();
-});
-
-$("#btn-flip").addEventListener("click", async () => {
-  state.facing = state.facing === "user" ? "environment" : "user";
-  try { await startCamera(); } catch (e) { setStatus(`caméra : ${e.message}`); }
-});
-
-$("#btn-rec").addEventListener("click", toggleRecording);
-
-// tap sur l'image (mobile) ou touche H : masquer / afficher la barre
-out.addEventListener("click", () => $("#bar").classList.toggle("hidden"));
-
-addEventListener("keydown", (e) => {
-  const n = +e.key;
-  if (n >= 1 && n <= MODES.length) { state.switcher.modeIdx = n - 1; syncButtons(); }
-  if (e.key === "h") $("#bar").classList.toggle("hidden");
-});

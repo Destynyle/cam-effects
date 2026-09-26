@@ -27,6 +27,20 @@ python main.py --effect <nom> [options]
 
 ---
 
+## Version web — https://destynyle.github.io/cam-effects/
+
+Les 5 effets tournent en direct dans le navigateur (desktop et smartphone), rien n'est envoyé.
+Sélecteur d'effet dans la barre du bas, `?` pour l'aide, ⟲ caméra avant/arrière, ● enregistrer.
+
+- `web/app.js` — noyau : caméra, boucle, modèles MediaPipe chargés à la demande, enregistrement
+- `web/effects/*.js` — un module par effet
+- `web/models/signs_knn.*` — KNN ninjutsu compressé (1 Mo, 99,6 %), regénéré par `python export_knn.py`
+- Lien direct : `?effect=multi_clone`, `?effect=blob_art&mode=vitrail`
+- Local : `python -m http.server 8000` puis http://localhost:8000/web/
+- Différence : `multi_clone` web utilise la segmentation de personne → pas de calibration du fond
+
+---
+
 ## Effets
 
 ### `blob_art` — Blob Art

@@ -1,0 +1,22 @@
+{
+  "labels": [
+    "Bird",
+    "Boar",
+    "Clap",
+    "Dog",
+    "Dragon",
+    "Hare",
+    "Horse",
+    "Idle",
+    "Monkey",
+    "Ox",
+    "Ram",
+    "Rat",
+    "Snake",
+    "Tiger"
+  ],
+  "scale": 27.46194819398442,
+  "dim": 126,
+  "count": 8389,
+  "k": 5
+}

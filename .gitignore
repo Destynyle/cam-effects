@@ -12,7 +12,7 @@ videopourblobart/
 *.webm
 
 # Modèles (hand_landmarker téléchargé auto ; KNN regénéré par train.py)
-models/
+/models/
 
 # Dataset cloné (repo git séparé)
 narutohandsigns/
