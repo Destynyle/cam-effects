@@ -232,7 +232,7 @@ export default {
   create({ setStatus }) {
     let knn = null;
     setStatus("chargement des signes…");
-    loadKnn()
+    const ready = loadKnn()
       .then((k) => { knn = k; setStatus(""); })
       .catch((e) => { console.error(e); setStatus("modèle des signes indisponible"); });
 
@@ -267,6 +267,7 @@ export default {
     }
 
     return {
+      ready,
       frame({ ctx, source, W, H, u, now, hands }) {
         ctx.drawImage(source, 0, 0);
         const t = now / 1000;

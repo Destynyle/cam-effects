@@ -13,72 +13,15 @@
  *   isActive(id)      bouton surligné ?
  *   onKey(key)        touche clavier
  *   useHands          false = pas besoin des mains pour l'instant
+ *   ready             promesse optionnelle : ressources chargées (attendue au rendu vidéo)
+ * Optionnel sur l'effet : variants [{ id, label, params }] — versions proposées
+ * au rendu vidéo (video.html) ; `params` arrive dans env.params de create().
  */
 
 import { EFFECTS } from "./effects/index.js";
+import { models, ensureModel, detectHands, segment } from "./mediapipe.js";
 
-const MP_VERSION = "0.10.14";
-const MP_URL     = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
-const HAND_MODEL =
-  "https://storage.googleapis.com/mediapipe-models/" +
-  "hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-const SEG_MODEL  =
-  "https://storage.googleapis.com/mediapipe-models/" +
-  "image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
-
-const REF_W    = 640;   // les tailles des effets sont pensées pour 640px
-const SEG_SIZE = 256;   // plus grand côté de l'image envoyée au segmenteur
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// MediaPipe — chargé une fois, à la demande
-// ══════════════════════════════════════════════════════════════════════════════
-
-let visionPromise = null;
-function loadVision() {
-  visionPromise ??= (async () => {
-    const mod = await import(`${MP_URL}/vision_bundle.mjs`);
-    const fileset = await mod.FilesetResolver.forVisionTasks(`${MP_URL}/wasm`);
-    return { ...mod, fileset };
-  })();
-  return visionPromise;
-}
-
-async function createWithFallback(Task, fileset, options) {
-  try {
-    return await Task.createFromOptions(fileset, { ...options, baseOptions: { ...options.baseOptions, delegate: "GPU" } });
-  } catch {
-    return await Task.createFromOptions(fileset, { ...options, baseOptions: { ...options.baseOptions, delegate: "CPU" } });
-  }
-}
-
-const models = { hands: null, segmenter: null };
-const loading = {};
-
-function ensureModel(kind) {
-  if (models[kind] || loading[kind]) return;
-  const label = kind === "hands" ? "modèle main" : "modèle silhouette";
-  setStatus(`chargement du ${label}…`);
-  loading[kind] = loadVision()
-    .then(({ HandLandmarker, ImageSegmenter, fileset }) =>
-      kind === "hands"
-        ? createWithFallback(HandLandmarker, fileset, {
-            baseOptions: { modelAssetPath: HAND_MODEL },
-            runningMode: "VIDEO",
-            numHands: 2,
-            minHandDetectionConfidence: 0.5,
-            minHandPresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          })
-        : createWithFallback(ImageSegmenter, fileset, {
-            baseOptions: { modelAssetPath: SEG_MODEL },
-            runningMode: "VIDEO",
-            outputConfidenceMasks: true,
-            outputCategoryMask: false,
-          }))
-    .then((m) => { models[kind] = m; setStatus(""); })
-    .catch((e) => { console.error(e); setStatus(`${label} indisponible`); });
-}
+const REF_W = 640;   // les tailles des effets sont pensées pour 640px
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -93,9 +36,6 @@ const ctx    = out.getContext("2d");
 // image propre de la caméra (miroir en frontale) — source commune des effets
 const frameCanvas = document.createElement("canvas");
 const frameCtx    = frameCanvas.getContext("2d");
-// image réduite pour la segmentation
-const segCanvas   = document.createElement("canvas");
-const segCtx      = segCanvas.getContext("2d");
 
 const params = new URLSearchParams(location.search);
 const state = {
@@ -125,8 +65,8 @@ function startEffect(def) {
   state.def = def;
   state.fx = def.create(env());
   state.seg = null;
-  if (def.needs?.hands) ensureModel("hands");
-  if (def.needs?.segmenter) ensureModel("segmenter");
+  if (def.needs?.hands) ensureModel("hands", setStatus).catch(() => {});
+  if (def.needs?.segmenter) ensureModel("segmenter", setStatus).catch(() => {});
 
   $("#effect").value = def.id;
   const url = new URL(location.href);
@@ -188,35 +128,8 @@ async function startCamera() {
   const W = video.videoWidth, H = video.videoHeight;
   out.width = frameCanvas.width = W;
   out.height = frameCanvas.height = H;
-  const s = SEG_SIZE / Math.max(W, H);
-  segCanvas.width = Math.round(W * s);
-  segCanvas.height = Math.round(H * s);
   state.lastTime = -1;
   startEffect(state.def);   // la résolution a pu changer : on recrée l'effet
-}
-
-function detectHands(now) {
-  const res = models.hands.detectForVideo(frameCanvas, now);
-  const W = frameCanvas.width, H = frameCanvas.height;
-  const handed = res.handedness ?? res.handednesses ?? [];
-  return (res.landmarks || []).map((lm, i) => ({
-    lm,                                              // normalisé 0-1 (repère affiché)
-    px: lm.map((p) => ({ x: p.x * W, y: p.y * H })), // pixels
-    handed: handed[i]?.[0]?.categoryName ?? null,
-  }));
-}
-
-function segment(now) {
-  segCtx.drawImage(frameCanvas, 0, 0, segCanvas.width, segCanvas.height);
-  models.segmenter.segmentForVideo(segCanvas, now, (res) => {
-    const m = res.confidenceMasks?.[0];
-    if (!m) return;
-    const data = m.getAsFloat32Array();
-    if (!state.seg || state.seg.mask.length !== data.length) {
-      state.seg = { mask: new Float32Array(data.length), w: m.width, h: m.height };
-    }
-    state.seg.mask.set(data);
-  });
 }
 
 function tick() {
@@ -234,8 +147,8 @@ function tick() {
   frameCtx.restore();
 
   let hands = null;
-  if (def.needs?.hands && fx.useHands !== false && models.hands) hands = detectHands(now);
-  if (def.needs?.segmenter && models.segmenter) segment(now);
+  if (def.needs?.hands && fx.useHands !== false && models.hands) hands = detectHands(frameCanvas);
+  if (def.needs?.segmenter && models.segmenter) state.seg = segment(frameCanvas, state.seg);
 
   ctx.save();
   fx.frame({ ctx, source: frameCanvas, W, H, u: Math.max(W, H) / REF_W, now, hands, seg: state.seg });

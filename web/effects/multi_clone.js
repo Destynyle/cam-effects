@@ -21,9 +21,11 @@ export default {
   help: "Mets-toi dans le cadre : ta silhouette est dupliquée en cercle autour de toi.<br>" +
         "Bouton pour changer le nombre de clones (ou touche C).",
   needs: { segmenter: true },
+  variants: CLONE_COUNTS.map((n) => ({ id: `${n}clones`, label: `${n} clones`, params: { clones: String(n) } })),
 
-  create({ W, H }) {
-    let countIdx = 1;
+  create({ W, H, params }) {
+    const wanted = CLONE_COUNTS.indexOf(+params.get("clones"));
+    let countIdx = wanted >= 0 ? wanted : 1;   // 4 clones par défaut
     const person = document.createElement("canvas");
     person.width = W; person.height = H;
     const personCtx = person.getContext("2d");

@@ -79,6 +79,9 @@ En mode fichier vidéo, la détection main est désactivée (mode fixe, plus rap
 - multi_clone : segmentation MediaPipe (plus de calibration fond)
 - ninjutsu : `export_knn.py` → 600 ex/signe, int8 → web/models/signs_knn.bin (1 Mo, 99,6 %)
 - shape_control : formes 3D ×size (la version Python les dessinait quasi ponctuelles : verts × size/80)
+- `video.html` + `video.js` : rendu fichier via Mediabunny 1.61 (Conversion + video.process), 1 MP4 par effet/variante.
+  Variantes déclarées par effet (`variants`, params → env.params). `allowTransformationMetadata:false` sinon double rotation.
+- `mediapipe.js` : modèles partagés live/vidéo, horloge monotone commune ; GPU logiciel (SwiftShader…) → délégué CPU (8× plus rapide)
 - Test headless : chromium --use-fake-device-for-media-stream --use-file-for-fake-video-capture=x.y4m + CDP
 - Caméra exige HTTPS (ou localhost)
 

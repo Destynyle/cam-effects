@@ -415,6 +415,8 @@ export default {
   help: "Bouge devant la caméra : les zones en mouvement deviennent des blobs colorés.<br>" +
         "Lève 1 à 4 doigts et tiens 1,5 s pour changer de mode (ou touches 1-4).",
   needs: { hands: true },
+  // rendu vidéo : mode fixe, pas de gestes (comme --mode en Python)
+  variants: MODES.map((m, i) => ({ id: m, label: MODE_LABELS[i], params: { mode: m, gestures: "0" } })),
 
   create({ W, H, params, refreshControls }) {
     const s = PROC_SIZE / Math.max(W, H);
@@ -430,7 +432,7 @@ export default {
     if (initial >= 0) switcher.modeIdx = initial;
 
     const fx = {
-      useHands: true,
+      useHands: params.get("gestures") !== "0",
 
       controls: [
         ...MODE_LABELS.map((l, i) => ({ id: `mode${i}`, label: `${i + 1} ${l}` })),

@@ -8,10 +8,10 @@
 import { HAND_CONNECTIONS, FINGERTIPS, rgb, circle } from "./common.js";
 
 const PALETTES = [
-  { name: "Chakra",   color: [0, 80, 255] },
-  { name: "Kyûbi",    color: [255, 110, 0] },
-  { name: "Senjutsu", color: [60, 255, 120] },
-  { name: "Susanoo",  color: [170, 60, 255] },
+  { id: "chakra",   name: "Chakra",   color: [0, 80, 255] },
+  { id: "kyubi",    name: "Kyûbi",    color: [255, 110, 0] },
+  { id: "senjutsu", name: "Senjutsu", color: [60, 255, 120] },
+  { id: "susanoo",  name: "Susanoo",  color: [170, 60, 255] },
 ];
 
 // trace un chemin en lueur additive : halo large → cœur blanc
@@ -88,11 +88,12 @@ export default {
   help: "Montre tes mains : squelette lumineux et toile d'énergie entre les doigts.<br>" +
         "Deux mains = lien de chakra entre les poignets. Bouton couleur (ou touche C).",
   needs: { hands: true },
+  variants: PALETTES.map((p) => ({ id: p.id, label: p.name, params: { color: p.id } })),
 
-  create() {
-    let palette = 0;
+  create({ params }) {
+    let palette = Math.max(0, PALETTES.findIndex((p) => p.id === params.get("color")));
     const fx = {
-      controls: [{ id: "color", label: PALETTES[0].name, title: "Changer la couleur" }],
+      controls: [{ id: "color", label: PALETTES[palette].name, title: "Changer la couleur" }],
       onControl() {
         palette = (palette + 1) % PALETTES.length;
         fx.controls[0].label = PALETTES[palette].name;

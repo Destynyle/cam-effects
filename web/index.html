@@ -73,6 +73,8 @@
     }
     #start h1 { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: .04em; }
     #start p { margin: 0; color: var(--muted); max-width: 420px; }
+    #start .alt { color: var(--muted); font-size: 13px; }
+    #start .alt:hover { color: var(--fg); }
     #start button:disabled { opacity: .5; cursor: default; }
     #start button {
       border-color: var(--accent); color: var(--accent);
@@ -105,6 +107,7 @@
     <p>Effets webcam en temps réel : Blob Art, Chakra, Multi-Clone, Ninjutsu, Shape Control.
        Tout tourne dans ton navigateur, rien n'est envoyé.</p>
     <button id="btn-start" disabled>Chargement…</button>
+    <a class="alt" href="video.html">ou applique les effets à une vidéo →</a>
   </div>
   <div id="status"></div>
 
